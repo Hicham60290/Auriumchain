@@ -21,6 +21,7 @@ pub mod security {
 pub mod network;
 pub mod mining;
 pub mod wallet;
-pub mod storage;
 pub mod rpc;
 pub mod utils;
+pub mod storage;
+pub mod p2p;

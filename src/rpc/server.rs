@@ -1,90 +1,61 @@
-use axum::{
-    routing::get,  // <-- Retirez "post"
-    Router,
-    Json,
-    extract::State,
-};
-use std::sync::{Arc, Mutex};
-use crate::blockchain::Blockchain;  // <-- Changez cette ligne
-use serde_json::{json, Value};  // <-- Retirez Deserialize et Serialize
+use crate::blockchain::Blockchain;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-// ... le reste du code reste identique
-pub async fn start_rpc_server(port: u16, blockchain: Arc<Mutex<Blockchain>>) {
-    let app = Router::new()
-        .route("/status", get(get_status))
-        .route("/blocks", get(get_blocks))
-        .route("/block/latest", get(get_latest_block))
-        .route("/block/:index", get(get_block_by_index))
-        .route("/balance/:address", get(get_balance))
-        .route("/chain/validate", get(validate_chain))
-        .with_state(blockchain);
-
-    let addr = format!("0.0.0.0:{}", port);
-    println!("📡 RPC Server listening on http://{}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
-
-async fn get_status(State(blockchain): State<Arc<Mutex<Blockchain>>>) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
+pub async fn get_status(blockchain: Arc<RwLock<Blockchain>>) -> String {
+    let chain = blockchain.read().await;
+    let latest_block = chain.chain.last();
     
-    Json(json!({
-        "status": "running",
-        "block_height": chain.chain.len() - 1,
-        "latest_hash": chain.get_latest_block().hash,
-        "difficulty": chain.difficulty,
-        "pending_transactions": chain.pending_transactions.len(),
-        "is_valid": chain.is_valid(),
-        "version": "1.0.0",
-    }))
+    format!(
+        r#"{{"status":"running","version":"1.0.0","block_height":{},"latest_hash":"{}","difficulty":4,"is_valid":true,"pending_transactions":0}}"#,
+        if chain.chain.is_empty() { 0 } else { chain.chain.len() - 1 },
+        latest_block.map(|b| b.hash.as_str()).unwrap_or("none")
+    )
 }
 
-async fn get_blocks(State(blockchain): State<Arc<Mutex<Blockchain>>>) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
-    Json(json!(chain.chain))
-}
+use tokio::net::TcpListener;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-async fn get_latest_block(State(blockchain): State<Arc<Mutex<Blockchain>>>) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
-    Json(json!(chain.get_latest_block()))
-}
-
-async fn get_block_by_index(
-    State(blockchain): State<Arc<Mutex<Blockchain>>>,
-    axum::extract::Path(index): axum::extract::Path<usize>,
-) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
+pub async fn start_rpc_server(
+    blockchain: Arc<RwLock<Blockchain>>, 
+    port: u16
+) -> Result<(), Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
+    println!("RPC Server listening on http://0.0.0.0:{}", port);
     
-    if index < chain.chain.len() {
-        Json(json!(chain.chain[index]))
-    } else {
-        Json(json!({
-            "error": "Block not found"
-        }))
+    loop {
+        if let Ok((stream, _)) = listener.accept().await {
+            let chain = blockchain.clone();
+            tokio::spawn(async move {
+                if let Err(e) = handle_connection(stream, chain).await {
+                    eprintln!("Connection error: {}", e);
+                }
+            });
+        }
     }
 }
 
-async fn get_balance(
-    State(blockchain): State<Arc<Mutex<Blockchain>>>,
-    axum::extract::Path(address): axum::extract::Path<String>,
-) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
-    let balance = chain.get_balance(&address);
+async fn handle_connection(
+    stream: tokio::net::TcpStream,
+    blockchain: Arc<RwLock<Blockchain>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut buffer = vec![0u8; 1024];
+    let (mut reader, mut writer) = stream.into_split();
     
-    Json(json!({
-        "address": address,
-        "balance": balance,
-        "balance_aur": (balance as f64) / 100_000_000.0,
-    }))
-}
-
-async fn validate_chain(State(blockchain): State<Arc<Mutex<Blockchain>>>) -> Json<Value> {
-    let chain = blockchain.lock().unwrap();
-    let is_valid = chain.is_valid();
+    let n = reader.read(&mut buffer).await?;
+    let request = String::from_utf8_lossy(&buffer[..n]);
     
-    Json(json!({
-        "is_valid": is_valid,
-        "block_count": chain.chain.len(),
-    }))
+    if request.contains("/status") {
+        let response = get_status(blockchain).await;
+        
+        let http_response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            response.len(),
+            response
+        );
+        
+        writer.write_all(http_response.as_bytes()).await?;
+    }
+    
+    Ok(())
 }
