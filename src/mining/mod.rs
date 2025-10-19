@@ -1,4 +1,6 @@
 pub mod miner;
 pub mod pow;
+pub mod energy;
 
-pub use miner::start_mining;
+pub use miner::Miner;
+pub use energy::{EnergyCalculator, EnergyTracker, BlockEnergyStats};
