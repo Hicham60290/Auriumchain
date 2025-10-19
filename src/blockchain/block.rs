@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use hex;
 use chrono::Utc;
+use std::time::Instant;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
     pub index: u64,
     pub timestamp: i64,
@@ -15,7 +17,7 @@ pub struct Block {
     pub merkle_root: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transaction {
     pub id: String,
     pub inputs: Vec<TxInput>,
@@ -24,7 +26,7 @@ pub struct Transaction {
     pub signature: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TxInput {
     pub prev_tx_id: String,
     pub output_index: usize,
@@ -32,7 +34,7 @@ pub struct TxInput {
     pub public_key: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TxOutput {
     pub value: u64,
     pub address: String,
@@ -79,26 +81,22 @@ impl Block {
 
     pub fn mine(&mut self) {
         let target = "0".repeat(self.difficulty as usize);
+        let start = Instant::now();
         
         println!("⛏️  Mining block {} (difficulty {})...", self.index, self.difficulty);
-        let start = Utc::now().timestamp();
         
         loop {
             self.hash = self.calculate_hash();
             
             if self.hash.starts_with(&target) {
-                let duration = Utc::now().timestamp() - start;
-                println!("✅ Block {} mined in {}s!", self.index, duration);
+                let duration = start.elapsed();
+                println!("✅ Block {} mined in {}s!", self.index, duration.as_secs());
                 println!("   Hash: {}", self.hash);
                 println!("   Nonce: {}", self.nonce);
                 break;
             }
             
             self.nonce += 1;
-            
-            if self.nonce % 100_000 == 0 {
-                print!("   Nonce: {}...\r", self.nonce);
-            }
         }
     }
 
@@ -179,13 +177,13 @@ impl Transaction {
     }
 
     pub fn total_input(&self) -> u64 {
-        0
+        self.inputs.iter().map(|_| 0).sum()
     }
 
     pub fn total_output(&self) -> u64 {
-        self.outputs.iter().map(|o| o.value).sum()
+        self.outputs.iter().map(|output| output.value).sum()
     }
-    
+
     pub fn is_coinbase(&self) -> bool {
         self.inputs.is_empty()
     }

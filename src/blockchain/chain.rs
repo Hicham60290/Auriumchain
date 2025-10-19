@@ -22,6 +22,50 @@ impl Blockchain {
         self.chain.last().unwrap()
     }
 
+    pub fn add_block(&mut self, block: Block) -> Result<(), String> {
+        let latest = self.get_latest_block();
+        
+        // PROTECTION 1: Genesis ne peut jamais être modifié ou remplacé
+        if block.index == 0 {
+            return Err("Cannot modify or replace Genesis block".to_string());
+        }
+        
+        // Validation basique
+        if !block.is_valid(latest) {
+            return Err("Block validation failed".to_string());
+        }
+
+        // PROTECTION 2: Vérifier la récompense du coinbase
+        if !block.transactions.is_empty() {
+            let coinbase = &block.transactions[0];
+            if coinbase.is_coinbase() {
+                let expected_reward = calculate_block_reward(block.index);
+                let actual_reward: u64 = coinbase.outputs.iter().map(|o| o.value).sum();
+                
+                if actual_reward > expected_reward {
+                    return Err(format!(
+                        "Excessive mining reward: got {}, expected max {}",
+                        actual_reward, expected_reward
+                    ));
+                }
+            }
+        }
+
+        // Validation sécurisée (si module security disponible)
+        #[cfg(feature = "enhanced_security")]
+        {
+            use crate::security::SecurityValidator;
+            let validator = SecurityValidator::new();
+            if let Err(e) = validator.validate_block_strict(&block, latest) {
+                log::error!("🚨 Security validation failed: {}", e);
+                return Err(format!("Security validation failed: {}", e));
+            }
+        }
+
+        self.chain.push(block);
+        Ok(())
+    }
+
     pub fn mine_pending_transactions(&mut self, miner_address: String) {
         let reward = calculate_block_reward(self.chain.len() as u64);
         
@@ -60,6 +104,19 @@ impl Blockchain {
     }
 
     pub fn is_valid(&self) -> bool {
+        // PROTECTION 3: Vérifier que le Genesis n'a pas été modifié
+        const EXPECTED_GENESIS_HASH: &str = "0000521165d99d6bcd916e3ac5ecc5897084ddd0572b5de740cc55972de500d9";
+        
+        if self.chain.is_empty() {
+            return false;
+        }
+        
+        if self.chain[0].hash != EXPECTED_GENESIS_HASH {
+            println!("❌ SECURITY ALERT: Genesis block has been modified!");
+            return false;
+        }
+        
+        // Vérifier toute la chaîne
         for i in 1..self.chain.len() {
             let current = &self.chain[i];
             let previous = &self.chain[i - 1];
