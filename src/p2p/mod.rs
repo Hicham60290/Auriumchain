@@ -1,11 +1,12 @@
 pub mod messages;
 pub mod peer_manager;
-pub mod sync;
-pub mod security;
 pub mod server;
+pub mod security;
+pub mod sync;
 
-pub use messages::*;
+// Imports spécifiques pour éviter les conflits
+pub use messages::P2PMessage as NetworkMessage;
 pub use peer_manager::*;
-pub use sync::*;
-pub use security::*;
 pub use server::*;
+pub use security::*;
+pub use sync::{SyncManager, BlockchainSync};

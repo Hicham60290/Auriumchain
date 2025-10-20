@@ -4,7 +4,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::blockchain::Blockchain;
-use crate::p2p::{P2PMessage, PeerManager, NetworkSecurity};
+use crate::p2p::{messages::P2PMessage, PeerManager, NetworkSecurity};
 
 pub struct P2PServer {
     blockchain: Arc<RwLock<Blockchain>>,

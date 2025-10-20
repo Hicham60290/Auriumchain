@@ -47,32 +47,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let blockchain = if args.genesis {
         println!("Creating new Genesis blockchain...");
         let mut chain = Blockchain::new();
+        
+        // Créer le bloc genesis
         let genesis = auriumchain::blockchain::Block::new(
-            0, 
-            vec![], 
-            "0".to_string(), 
-            4, 
-            wallet_addr.clone()
+            0,
+            vec![],
+            "0".to_string(),
+            4,
+            wallet_addr.clone(),
         );
         chain.chain.push(genesis.clone());
         
         if let Err(e) = chain.save_to_file(&args.data_file) {
             eprintln!("Error saving blockchain: {}", e);
+        } else {
+            println!("Blockchain saved: {} blocks to {}", chain.chain.len(), args.data_file);
         }
         
-        println!("Genesis Block created: {}", genesis.hash);
+        println!("Genesis Block created!");
         chain
     } else {
         println!("Loading blockchain from {}...", args.data_file);
         match Blockchain::load_from_file(&args.data_file) {
             Ok(chain) => {
+                println!("Blockchain loaded: {} blocks from {}", chain.chain.len(), args.data_file);
                 println!("Loaded {} blocks", chain.chain.len());
                 chain
             },
             Err(e) => {
                 println!("Error loading blockchain: {}", e);
-                println!("Use --genesis to create a new one");
-                return Ok(());
+                println!("Creating new blockchain...");
+                let mut chain = Blockchain::new();
+                
+                // Créer le bloc genesis par défaut
+                let genesis = auriumchain::blockchain::Block::new(
+                    0,
+                    vec![],
+                    "0".to_string(),
+                    4,
+                    wallet_addr.clone(),
+                );
+                chain.chain.push(genesis);
+                chain
             }
         }
     };
@@ -105,16 +121,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(addr) = peer_addr.parse() {
             peer_manager.add_peer(addr).await;
             println!("Added peer: {}", addr);
-            
-            if let Err(e) = sync_manager.sync_with_peer(addr).await {
-                eprintln!("Sync error: {}", e);
-            }
         }
     }
+    
+    // **NOUVELLE FONCTIONNALITÉ : Synchronisation automatique périodique**
+    let sync_manager_periodic = sync_manager.clone();
+    let peer_manager_sync = peer_manager.clone();
+    tokio::spawn(async move {
+        loop {
+            // Attendre 30 secondes avant chaque cycle de synchronisation
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            
+            let peers = peer_manager_sync.get_all_peers().await;
+            if !peers.is_empty() {
+                println!("Starting periodic sync with {} peers...", peers.len());
+                
+                for peer_addr in peers {
+                    match sync_manager_periodic.sync_with_peer(peer_addr).await {
+                        Ok(synced) => {
+                            if synced {
+                                println!("✅ Synchronized new blocks from peer: {}", peer_addr);
+                            }
+                        },
+                        Err(e) => {
+                            println!("❌ Sync failed with peer {}: {}", peer_addr, e);
+                        }
+                    }
+                }
+            }
+        }
+    });
     
     let blockchain_rpc = blockchain.clone();
     let blockchain_mining = blockchain.clone();
     let data_file_mining = args.data_file.clone();
+    let sync_manager_mining = sync_manager.clone();
     
     // Démarrer RPC
     tokio::spawn(async move {
@@ -123,13 +164,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     
-    // Démarrer mining avec sauvegarde
+    // **AMÉLIORATION : Mining avec propagation automatique des blocs**
     if args.mining {
         tokio::spawn(async move {
             loop {
                 let start = std::time::Instant::now();
                 
-                {
+                let new_block = {
                     let mut chain = blockchain_mining.write().await;
                     if let Some(prev_block) = chain.chain.last().cloned() {
                         let new_block = auriumchain::blockchain::Block::new(
@@ -144,12 +185,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         
                         if let Err(e) = chain.save_to_file(&data_file_mining) {
                             eprintln!("Error saving blockchain: {}", e);
+                        } else {
+                            println!("Blockchain saved: {} blocks to {}", chain.chain.len(), data_file_mining);
                         }
                         
                         println!("Block {} mined and saved (TLS)!", new_block.index);
                         println!("   Hash: {}", new_block.hash);
                         println!("   Chain: {} blocks", chain.chain.len());
+                        
+                        Some(new_block)
+                    } else {
+                        None
                     }
+                };
+                
+                // **NOUVELLE FONCTIONNALITÉ : Propager le nouveau bloc vers tous les peers**
+                if let Some(block) = new_block {
+                    tokio::spawn({
+                        let sync_manager = sync_manager_mining.clone();
+                        async move {
+                            if let Err(e) = sync_manager.broadcast_new_block(block).await {
+                                eprintln!("Failed to broadcast new block: {}", e);
+                            } else {
+                                println!("📡 New block broadcasted to all peers");
+                            }
+                        }
+                    });
                 }
                 
                 let elapsed = start.elapsed();
@@ -160,7 +221,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     
+    println!("P2P Server (TLS) listening on 0.0.0.0:{}", args.port);
+    println!("RPC Server listening on http://0.0.0.0:{}", args.rpc_port);
     println!("TLS P2P Node running! Press Ctrl+C to stop");
+    
+    // **NOUVELLE FONCTIONNALITÉ : Synchronisation initiale au démarrage**
+    if !args.genesis {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        println!("🔄 Starting initial synchronization...");
+        
+        let peers = peer_manager.get_all_peers().await;
+        for peer_addr in peers {
+            match sync_manager.sync_with_peer(peer_addr).await {
+                Ok(synced) => {
+                    if synced {
+                        println!("✅ Initial sync completed with peer: {}", peer_addr);
+                    } else {
+                        println!("ℹ️  Already up to date with peer: {}", peer_addr);
+                    }
+                },
+                Err(e) => {
+                    println!("❌ Initial sync failed with peer {}: {}", peer_addr, e);
+                }
+            }
+        }
+    }
     
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;

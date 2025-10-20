@@ -55,6 +55,37 @@ async fn handle_balance_request(
         r#"{"error":"Invalid balance request"}"#.to_string()
     }
 }
+
+async fn get_chain_info(
+    blockchain: Arc<RwLock<Blockchain>>,
+) -> String {
+    let chain = blockchain.read().await;
+    let height = chain.get_chain_length() as u64;
+    let latest_hash = chain.get_latest_block()
+        .map(|b| b.hash.clone())
+        .unwrap_or_default();
+    
+    format!(
+        r#"{{"height":{},"latest_hash":"{}","difficulty":{}}}"#,
+        height, latest_hash, chain.get_difficulty()
+    )
+}
+
+async fn get_blocks_from(
+    blockchain: Arc<RwLock<Blockchain>>,
+    from_height: u64,
+) -> String {
+    let chain = blockchain.read().await;
+    let blocks: Vec<_> = chain.chain.iter()
+        .skip(from_height as usize)
+        .collect();
+    
+    match serde_json::to_string(&blocks) {
+        Ok(json) => json,
+        Err(_) => r#"{"error":"Serialization failed"}"#.to_string(),
+    }
+}
+
 async fn handle_connection(
     stream: tokio::net::TcpStream,
     blockchain: Arc<RwLock<Blockchain>>,
@@ -64,7 +95,6 @@ async fn handle_connection(
     let n = reader.read(&mut buffer).await?;
     let request = String::from_utf8_lossy(&buffer[..n]);
     
-    // Extraire le path de la requête HTTP
     let path = if let Some(first_line) = request.lines().next() {
         if let Some(path_start) = first_line.find(' ') {
             if let Some(path_end) = first_line[path_start + 1..].find(' ') {
@@ -83,16 +113,45 @@ async fn handle_connection(
         get_status(blockchain).await
     } else if path.starts_with("/balance/") {
         handle_balance_request(blockchain, path).await
+    } else if path == "/chain_info" {
+        get_chain_info(blockchain).await
+    } else if path.starts_with("/blocks_from/") {
+        let height_str = path.strip_prefix("/blocks_from/").unwrap_or("0");
+        let from_height = height_str.parse().unwrap_or(0);
+        get_blocks_from(blockchain, from_height).await
     } else {
         r#"{"error":"Not found"}"#.to_string()
     };
     
     let http_response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
         response.len(),
         response
     );
     writer.write_all(http_response.as_bytes()).await?;
     
     Ok(())
+}
+
+
+
+async fn handle_new_block(
+    blockchain: Arc<RwLock<Blockchain>>,
+    body: &str,
+) -> String {
+    match serde_json::from_str::<crate::blockchain::Block>(body) {
+        Ok(block) => {
+            let mut chain = blockchain.write().await;
+            if chain.validate_new_block(&block) {
+                chain.chain.push(block);
+                if let Err(e) = chain.save_to_file("/tmp/auriumchain.json") {
+                    eprintln!("Failed to save blockchain: {}", e);
+                }
+                r#"{"status":"block_accepted"}"#.to_string()
+            } else {
+                r#"{"error":"invalid_block"}"#.to_string()
+            }
+        },
+        Err(_) => r#"{"error":"invalid_json"}"#.to_string(),
+    }
 }
