@@ -1,0 +1,110 @@
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionInput {
+    pub previous_output: String,  // Hash de la transaction précédente
+    pub output_index: u32,        // Index de l'output utilisé
+    pub signature: String,        // Signature de l'expéditeur
+    pub public_key: String,       // Clé publique de l'expéditeur
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionOutput {
+    pub amount: u64,              // Montant en satoshis
+    pub recipient: String,        // Adresse du destinataire
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub id: String,
+    pub inputs: Vec<TransactionInput>,
+    pub outputs: Vec<TransactionOutput>,
+    pub timestamp: i64,
+    pub fee: u64,
+}
+
+impl Transaction {
+    pub fn new(
+        inputs: Vec<TransactionInput>,
+        outputs: Vec<TransactionOutput>,
+        fee: u64,
+    ) -> Self {
+        let mut tx = Transaction {
+            id: String::new(),
+            inputs,
+            outputs,
+            timestamp: chrono::Utc::now().timestamp(),
+            fee,
+        };
+        
+        tx.id = tx.calculate_hash();
+        tx
+    }
+    
+    pub fn calculate_hash(&self) -> String {
+        let mut hasher = Sha256::new();
+        let data = format!(
+            "{}{}{}{}",
+            serde_json::to_string(&self.inputs).unwrap_or_default(),
+            serde_json::to_string(&self.outputs).unwrap_or_default(),
+            self.timestamp,
+            self.fee
+        );
+        hasher.update(data.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+    
+    pub fn get_input_amount(&self, utxo_set: &HashMap<String, TransactionOutput>) -> u64 {
+        self.inputs.iter()
+            .map(|input| {
+                let key = format!("{}:{}", input.previous_output, input.output_index);
+                utxo_set.get(&key).map(|output| output.amount).unwrap_or(0)
+            })
+            .sum()
+    }
+    
+    pub fn get_output_amount(&self) -> u64 {
+        self.outputs.iter().map(|output| output.amount).sum()
+    }
+    
+    pub fn is_coinbase(&self) -> bool {
+        self.inputs.len() == 1 && 
+        self.inputs[0].previous_output == "0" && 
+        self.inputs[0].output_index == 0
+    }
+    
+    pub fn validate(&self, utxo_set: &HashMap<String, TransactionOutput>) -> bool {
+        if self.is_coinbase() {
+            return true; // Les transactions coinbase sont toujours valides
+        }
+        
+        if self.inputs.is_empty() || self.outputs.is_empty() {
+            return false;
+        }
+        
+        let input_amount = self.get_input_amount(utxo_set);
+        let output_amount = self.get_output_amount();
+        
+        // Vérifier que les inputs couvrent les outputs + fees
+        input_amount >= output_amount + self.fee
+    }
+}
+
+// Transaction coinbase pour les récompenses de mining
+pub fn create_coinbase_transaction(miner_address: String, reward: u64, block_height: u64) -> Transaction {
+    let input = TransactionInput {
+        previous_output: "0".to_string(),
+        output_index: 0,
+        signature: format!("coinbase-{}", block_height),
+        public_key: "system".to_string(),
+    };
+    
+    let output = TransactionOutput {
+        amount: reward,
+        recipient: miner_address,
+    };
+    
+    Transaction::new(vec![input], vec![output], 0)
+}
