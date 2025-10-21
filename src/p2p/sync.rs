@@ -102,24 +102,35 @@ impl SyncManager {
             // Appliquer les nouveaux blocs
             let mut chain = self.blockchain.write().await;
             let mut applied_blocks = 0;
-            
-            for block in new_blocks {
-                if chain.validate_new_block(&block) {
-                    chain.chain.push(block);
-                    applied_blocks += 1;
+
+            println!("📥 Attempting to apply {} downloaded blocks...", new_blocks.len());
+
+            for (i, block) in new_blocks.iter().enumerate() {
+                let current_chain_len = chain.chain.len();
+                let latest_block_info = if let Some(latest) = chain.get_latest_block() {
+                    format!("index={}, hash={}", latest.index, &latest.hash[..16])
                 } else {
-                    println!("❌ Rejected invalid block from peer");
+                    "empty chain".to_string()
+                };
+
+                println!("🔍 Validating block {}/{}: index={}, prev_hash={}, current_chain_len={}, latest_block=[{}]",
+                    i+1, new_blocks.len(), block.index, &block.previous_hash[..16], current_chain_len, latest_block_info);
+
+                if chain.validate_new_block(block) {
+                    chain.chain.push(block.clone());
+                    applied_blocks += 1;
+                    println!("✓ Block {} accepted (chain now has {} blocks)", block.index, chain.chain.len());
+                } else {
+                    println!("❌ Rejected invalid block {} from peer (validation failed)", block.index);
+                    println!("   Block hash: {}", &block.hash[..32]);
+                    println!("   Calculated: {}", &block.calculate_hash()[..32]);
                     break;
                 }
             }
-            
+
             if applied_blocks > 0 {
-                // Sauvegarder la blockchain mise à jour
-                if let Err(e) = chain.save_to_file("/tmp/auriumchain.json") {
-                    println!("⚠️ Failed to save updated blockchain: {}", e);
-                }
-                
-                println!("✅ Successfully synchronized {} new blocks from {}", applied_blocks, peer_addr);
+                println!("✅ Successfully synchronized {} new blocks from {} (chain now: {} blocks)",
+                    applied_blocks, peer_addr, chain.chain.len());
                 return Ok(true);
             }
         } else if peer_height < our_height {
