@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use crate::utils::quantum_hash_hex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionInput {
@@ -44,11 +45,10 @@ impl Transaction {
     }
     
     pub fn calculate_hash(&self) -> String {
-        let mut hasher = Sha256::new();
-        let data = format!("{:?}{:?}{}{}", 
+        // Use quantum-resistant double hashing: SHA-256 + BLAKE3
+        let data = format!("{:?}{:?}{}{}",
             self.inputs, self.outputs, self.timestamp, self.fee);
-        hasher.update(data.as_bytes());
-        format!("{:x}", hasher.finalize())
+        quantum_hash_hex(data.as_bytes())
     }
     
     pub fn is_coinbase(&self) -> bool {

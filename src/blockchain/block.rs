@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 use hex;
 use chrono::Utc;
 use std::time::Instant;
+use crate::utils::{quantum_block_hash, quantum_hash_hex};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
@@ -64,19 +65,16 @@ impl Block {
     }
 
     pub fn calculate_hash(&self) -> String {
-        let data = format!(
-            "{}{}{}{}{}{}",
+        // Use quantum-resistant double hashing: SHA-256 + BLAKE3
+        quantum_block_hash(
             self.index,
             self.timestamp,
-            self.merkle_root,
-            self.previous_hash,
+            &self.previous_hash,
+            &self.merkle_root,
             self.nonce,
-            self.miner_address
-        );
-        
-        let hash1 = Sha256::digest(data.as_bytes());
-        let hash2 = Sha256::digest(&hash1);
-        hex::encode(hash2)
+            self.difficulty as usize,
+            &self.miner_address,
+        )
     }
 
     pub fn mine(&mut self) {
@@ -126,15 +124,16 @@ impl Block {
             return "0".repeat(64);
         }
 
+        // Use quantum-resistant hashing for each transaction
         let mut hashes: Vec<String> = transactions
             .iter()
             .map(|tx| {
                 let data = serde_json::to_string(tx).unwrap();
-                let hash = Sha256::digest(data.as_bytes());
-                hex::encode(hash)
+                quantum_hash_hex(data.as_bytes())
             })
             .collect();
 
+        // Build Merkle tree with quantum-resistant hashing
         while hashes.len() > 1 {
             let mut new_hashes = Vec::new();
 
@@ -145,8 +144,7 @@ impl Block {
                     format!("{}{}", chunk[0], chunk[0])
                 };
 
-                let hash = Sha256::digest(combined.as_bytes());
-                new_hashes.push(hex::encode(hash));
+                new_hashes.push(quantum_hash_hex(combined.as_bytes()));
             }
 
             hashes = new_hashes;
@@ -172,8 +170,8 @@ impl Transaction {
 
     fn calculate_id(inputs: &[TxInput], outputs: &[TxOutput], timestamp: i64) -> String {
         let data = format!("{:?}{:?}{}", inputs, outputs, timestamp);
-        let hash = Sha256::digest(data.as_bytes());
-        hex::encode(hash)
+        // Use quantum-resistant hashing for transaction ID
+        quantum_hash_hex(data.as_bytes())
     }
 
     pub fn total_input(&self) -> u64 {
