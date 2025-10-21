@@ -19,9 +19,10 @@ path = "src/bin/migrate_to_rocksdb.rs"
 name = "auriumchain-keygen"
 path = "src/bin/generate_wallet.rs"
 
-[[bin]]
-name = "auriumchain-quantum-keygen"
-path = "src/bin/quantum_wallet_gen.rs"
+# Disabled: quantum wallet generator has import issues and is not needed for classic wallet deployment
+# [[bin]]
+# name = "auriumchain-quantum-keygen"
+# path = "src/bin/quantum_wallet_gen.rs"
 
 [dependencies]
 tokio = { version = "1.39", features = ["full"] }
