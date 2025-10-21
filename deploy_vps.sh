@@ -15,15 +15,19 @@ GITHUB_REPO="https://github.com/Hicham60290/Auriumchain.git"
 BRANCH="claude/review-auriumchain-history-011CULocdT6NysTPpkvXH2K1"
 INSTALL_DIR="$HOME/auriumchain-core"
 
-# VPS wallet addresses (à remplir)
-VPS1_WALLET=""  # Remplacer par votre adresse AUR3xxxxx
-VPS2_WALLET=""  # Remplacer par votre adresse AUR3xxxxx
-VPS3_WALLET=""  # Remplacer par votre adresse AUR3xxxxx
+# VPS wallet addresses - Classic ECDSA wallets (AUR1...)
+VPS1_WALLET="AUR1Z9uNKX94ZRv7zgTN9HHGWdMzu8BSssRP9A"
+VPS2_WALLET="AUR1Yx1Xx9teinx3VpLuZGwQ4ns5sH1yfnfMBa"
+VPS3_WALLET="AUR1YsVs3WKhMSmdyN3NXP4qwq3Huz4BuAHEoB"
 
 # Peer addresses
-VPS1_IP="REMPLACER_PAR_IP_VPS1"
-VPS2_IP="REMPLACER_PAR_IP_VPS2"
-VPS3_IP="REMPLACER_PAR_IP_VPS3"
+VPS1_IP="85.190.98.161"
+VPS2_IP="192.162.86.5"
+VPS3_IP="192.162.86.32"
+
+# RocksDB storage path (production mode)
+DATA_DIR="$HOME/auriumchain-data"
+ROCKSDB_PATH="$DATA_DIR/rocksdb"
 
 usage() {
     echo "Usage: $0 [vps1|vps2|vps3]"
@@ -126,8 +130,14 @@ deploy_vps() {
     if [ -n "$peers" ]; then
         echo -e "${GREEN}║   Peers: ${peers:0:30}...  ║${NC}"
     fi
+    echo -e "${GREEN}║   Storage: RocksDB (Production)               ║${NC}"
     echo -e "${GREEN}╚═══════════════════════════════════════════════╝${NC}"
     echo ""
+
+    # Créer le répertoire pour RocksDB
+    echo -e "${YELLOW}Création du répertoire de données RocksDB...${NC}"
+    mkdir -p "$ROCKSDB_PATH"
+    echo -e "${GREEN}✓ Répertoire créé: $ROCKSDB_PATH${NC}"
 
     # Créer le fichier de service systemd
     create_systemd_service $vps_num "$wallet" "$peers"
@@ -160,7 +170,7 @@ create_systemd_service() {
     local wallet=$2
     local peers=$3
 
-    echo -e "${YELLOW}Création du service systemd...${NC}"
+    echo -e "${YELLOW}Création du service systemd avec RocksDB...${NC}"
 
     local peers_arg=""
     if [ -n "$peers" ]; then
@@ -169,14 +179,14 @@ create_systemd_service() {
 
     sudo tee /etc/systemd/system/auriumchain.service > /dev/null <<EOF
 [Unit]
-Description=AuriumChain Node VPS${vps_num}
+Description=AuriumChain Node VPS${vps_num} (Production RocksDB)
 After=network.target
 
 [Service]
 Type=simple
 User=$USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/target/release/auriumchain --mining --miner-address $wallet $peers_arg
+ExecStart=$INSTALL_DIR/target/release/auriumchain --mining --miner-address $wallet --rocksdb-path $ROCKSDB_PATH $peers_arg
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -188,13 +198,13 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/tmp
+ReadWritePaths=$DATA_DIR
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    echo -e "${GREEN}✓ Service systemd créé${NC}"
+    echo -e "${GREEN}✓ Service systemd créé avec RocksDB${NC}"
 }
 
 main() {
