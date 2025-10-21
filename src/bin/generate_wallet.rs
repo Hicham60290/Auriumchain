@@ -8,22 +8,13 @@ use auriumchain::wallet::address::generate_address;
 struct Args {
     #[arg(short = 'n', long, default_value = "1", help = "Number of addresses to generate")]
     count: usize,
-
-    #[arg(short = 't', long, default_value = "AUR3", help = "Address type: AUR1, AUR2, or AUR3")]
-    address_type: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let args = Args::parse();
 
     println!("AuriumChain Wallet Generator");
     println!("============================\n");
-
-    // Validate address type
-    if !["AUR1", "AUR2", "AUR3"].contains(&args.address_type.as_str()) {
-        eprintln!("Error: Invalid address type. Use AUR1, AUR2, or AUR3");
-        std::process::exit(1);
-    }
 
     for i in 0..args.count {
         if args.count > 1 {
@@ -32,24 +23,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Generate key pair
-        let keypair = KeyPair::generate()?;
+        let keypair = KeyPair::generate();
 
-        // Generate address based on type
-        let address = match args.address_type.as_str() {
-            "AUR1" => generate_address(&keypair.public_key, "AUR1")?,
-            "AUR2" => {
-                // For quantum-resistant, we'd need different key generation
-                println!("⚠️  AUR2 (quantum-resistant) requires special key generation");
-                generate_address(&keypair.public_key, "AUR2")?
-            },
-            "AUR3" => generate_address(&keypair.public_key, "AUR3")?,
-            _ => unreachable!(),
-        };
+        // Generate address (AUR1 by default)
+        let address = generate_address(&keypair.public_key.serialize());
 
         // Display wallet info
         println!("Address:      {}", address);
-        println!("Public Key:   {}", hex::encode(&keypair.public_key));
-        println!("Private Key:  {}", hex::encode(&keypair.secret_key));
+        println!("Public Key:   {}", hex::encode(keypair.public_key.serialize()));
+        println!("Private Key:  {}", hex::encode(keypair.private_key.secret_bytes()));
 
         println!("\n⚠️  IMPORTANT SECURITY WARNINGS:");
         println!("   1. NEVER share your private key with anyone!");
@@ -67,6 +49,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n✅ Wallet(s) generated successfully!");
-
-    Ok(())
+    println!("\n🔐 NOTE: This generates AUR1 addresses (standard ECDSA)");
 }
