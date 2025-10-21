@@ -69,8 +69,7 @@ impl PeerManager {
 
 impl PeerManager {
     pub async fn get_all_peers(&self) -> Vec<std::net::SocketAddr> {
-        // Pour l'instant, retourner une liste vide
-        // À implémenter avec la vraie liste des peers connectés
-        vec![]
+        // Return the actual list of connected peers
+        self.peers.read().await.keys().cloned().collect()
     }
 }
