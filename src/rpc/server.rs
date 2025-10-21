@@ -1,18 +1,6 @@
 use crate::blockchain::Blockchain;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-pub async fn get_status(blockchain: Arc<RwLock<Blockchain>>) -> String {
-    let chain = blockchain.read().await;
-    let latest_block = chain.chain.last();
-    
-    format!(
-        r#"{{"status":"running","version":"1.0.0","block_height":{},"latest_hash":"{}","difficulty":4,"is_valid":true,"pending_transactions":0}}"#,
-        if chain.chain.is_empty() { 0 } else { chain.chain.len() - 1 },
-        latest_block.map(|b| b.hash.as_str()).unwrap_or("none")
-    )
-}
-
 use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -35,14 +23,32 @@ pub async fn start_rpc_server(
     }
 }
 
+pub async fn get_status(blockchain: Arc<RwLock<Blockchain>>) -> String {
+    let chain = blockchain.read().await;
+    let latest_block = chain.chain.last();
+    
+    format!(
+        r#"{{"status":"running","version":"1.0.0","block_height":{},"latest_hash":"{}","difficulty":4,"is_valid":true,"pending_transactions":0}}"#,
+        if chain.chain.is_empty() { 0 } else { chain.chain.len() - 1 },
+        latest_block.map(|b| b.hash.as_str()).unwrap_or("none")
+    )
+}
 
-
+async fn get_all_blocks(
+    blockchain: Arc<RwLock<Blockchain>>,
+) -> String {
+    let chain = blockchain.read().await;
+    
+    match serde_json::to_string(&chain.chain) {
+        Ok(json) => json,
+        Err(_) => r#"{"error":"Serialization failed"}"#.to_string(),
+    }
+}
 
 async fn handle_balance_request(
     blockchain: Arc<RwLock<Blockchain>>,
     path: &str,
 ) -> String {
-    // Extraire l'adresse du path /balance/ADDRESS
     if let Some(address) = path.strip_prefix("/balance/") {
         let chain = blockchain.read().await;
         let balance = chain.get_balance(address);
@@ -86,55 +92,6 @@ async fn get_blocks_from(
     }
 }
 
-async fn handle_connection(
-    stream: tokio::net::TcpStream,
-    blockchain: Arc<RwLock<Blockchain>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut buffer = vec![0u8; 1024];
-    let (mut reader, mut writer) = stream.into_split();
-    let n = reader.read(&mut buffer).await?;
-    let request = String::from_utf8_lossy(&buffer[..n]);
-    
-    let path = if let Some(first_line) = request.lines().next() {
-        if let Some(path_start) = first_line.find(' ') {
-            if let Some(path_end) = first_line[path_start + 1..].find(' ') {
-                &first_line[path_start + 1..path_start + 1 + path_end]
-            } else {
-                "/status"
-            }
-        } else {
-            "/status"
-        }
-    } else {
-        "/status"
-    };
-    
-    let response = if path == "/status" {
-        get_status(blockchain).await
-    } else if path.starts_with("/balance/") {
-        handle_balance_request(blockchain, path).await
-    } else if path == "/chain_info" {
-        get_chain_info(blockchain).await
-    } else if path.starts_with("/blocks_from/") {
-        let height_str = path.strip_prefix("/blocks_from/").unwrap_or("0");
-        let from_height = height_str.parse().unwrap_or(0);
-        get_blocks_from(blockchain, from_height).await
-    } else {
-        r#"{"error":"Not found"}"#.to_string()
-    };
-    
-    let http_response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
-        response.len(),
-        response
-    );
-    writer.write_all(http_response.as_bytes()).await?;
-    
-    Ok(())
-}
-
-
-
 async fn handle_new_block(
     blockchain: Arc<RwLock<Blockchain>>,
     body: &str,
@@ -154,4 +111,53 @@ async fn handle_new_block(
         },
         Err(_) => r#"{"error":"invalid_json"}"#.to_string(),
     }
+}
+
+async fn handle_connection(
+    stream: tokio::net::TcpStream,
+    blockchain: Arc<RwLock<Blockchain>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut buffer = vec![0u8; 8192];
+    let (mut reader, mut writer) = stream.into_split();
+    let n = reader.read(&mut buffer).await?;
+    let request = String::from_utf8_lossy(&buffer[..n]);
+    
+    let (method, path, body) = if let Some(first_line) = request.lines().next() {
+        let parts: Vec<&str> = first_line.split_whitespace().collect();
+        let method = parts.get(0).unwrap_or(&"GET");
+        let path = parts.get(1).unwrap_or(&"/status");
+        
+        let body = if let Some(body_start) = request.find("\r\n\r\n") {
+            &request[body_start + 4..]
+        } else {
+            ""
+        };
+        
+        (*method, *path, body)
+    } else {
+        ("GET", "/status", "")
+    };
+    
+    let response = match (method, path) {
+        ("GET", "/status") => get_status(blockchain).await,
+        ("GET", "/blocks") => get_all_blocks(blockchain).await,
+        ("GET", "/chain_info") => get_chain_info(blockchain).await,
+        ("GET", path) if path.starts_with("/balance/") => handle_balance_request(blockchain, path).await,
+        ("GET", path) if path.starts_with("/blocks_from/") => {
+            let height_str = path.strip_prefix("/blocks_from/").unwrap_or("0");
+            let from_height = height_str.parse().unwrap_or(0);
+            get_blocks_from(blockchain, from_height).await
+        },
+        ("POST", "/new_block") => handle_new_block(blockchain, body).await,
+        _ => r#"{"error":"Not found"}"#.to_string(),
+    };
+    
+    let http_response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+        response.len(),
+        response
+    );
+    writer.write_all(http_response.as_bytes()).await?;
+    
+    Ok(())
 }
