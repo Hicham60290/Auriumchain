@@ -15,6 +15,10 @@ path = "src/bin/wallet.rs"
 name = "auriumchain-migrate"
 path = "src/bin/migrate_to_rocksdb.rs"
 
+[[bin]]
+name = "auriumchain-keygen"
+path = "src/bin/generate_wallet.rs"
+
 [dependencies]
 tokio = { version = "1.39", features = ["full"] }
 clap = { version = "4.0", features = ["derive"] }

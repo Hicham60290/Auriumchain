@@ -30,6 +30,9 @@ struct Args {
 
     #[arg(long, help = "Use RocksDB for storage (production mode)")]
     rocksdb_path: Option<String>,
+
+    #[arg(long, help = "Miner address to receive block rewards (AUR3...)")]
+    miner_address: Option<String>,
 }
 
 #[tokio::main]
@@ -57,7 +60,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Data file: {}", args.data_file);
     }
 
-    let wallet_addr = "AUR3ZnxihprBGetUiMoHwRWZbcyU94TzP52Jkk".to_string();
+    // Miner address - configurable via CLI or use default
+    let wallet_addr = args.miner_address.clone().unwrap_or_else(|| {
+        let default_addr = "AUR3ZnxihprBGetUiMoHwRWZbcyU94TzP52Jkk".to_string();
+        println!("⚠️  WARNING: Using default miner address: {}", default_addr);
+        println!("⚠️  For production, use --miner-address to specify your own address!");
+        default_addr
+    });
+
+    println!("Miner addr: {}", wallet_addr);
 
     // Charger ou créer la blockchain
     let (blockchain, db_handle) = if let Some(ref rocksdb_path) = args.rocksdb_path {
