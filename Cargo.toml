@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "auriumchain-wallet"
 path = "src/bin/wallet.rs"
 
+[[bin]]
+name = "auriumchain-migrate"
+path = "src/bin/migrate_to_rocksdb.rs"
+
 [dependencies]
 tokio = { version = "1.39", features = ["full"] }
 clap = { version = "4.0", features = ["derive"] }
@@ -42,3 +46,8 @@ rustls-pemfile = "1.0"
 webpki-roots = "0.25"
 rcgen = "0.11"
 reqwest = { version = "0.11", features = ["json"] }
+rocksdb = "0.22"
+num_cpus = "1.16"
+
+[dev-dependencies]
+tempfile = "3.8"
