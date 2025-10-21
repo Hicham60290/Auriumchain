@@ -108,13 +108,15 @@ impl SyncManager {
             for (i, block) in new_blocks.iter().enumerate() {
                 let current_chain_len = chain.chain.len();
                 let latest_block_info = if let Some(latest) = chain.get_latest_block() {
-                    format!("index={}, hash={}", latest.index, &latest.hash[..16])
+                    let hash_preview = if latest.hash.len() > 16 { &latest.hash[..16] } else { &latest.hash };
+                    format!("index={}, hash={}", latest.index, hash_preview)
                 } else {
                     "empty chain".to_string()
                 };
 
+                let prev_hash_preview = if block.previous_hash.len() > 16 { &block.previous_hash[..16] } else { &block.previous_hash };
                 println!("🔍 Validating block {}/{}: index={}, prev_hash={}, current_chain_len={}, latest_block=[{}]",
-                    i+1, new_blocks.len(), block.index, &block.previous_hash[..16], current_chain_len, latest_block_info);
+                    i+1, new_blocks.len(), block.index, prev_hash_preview, current_chain_len, latest_block_info);
 
                 if chain.validate_new_block(block) {
                     chain.chain.push(block.clone());
@@ -122,8 +124,11 @@ impl SyncManager {
                     println!("✓ Block {} accepted (chain now has {} blocks)", block.index, chain.chain.len());
                 } else {
                     println!("❌ Rejected invalid block {} from peer (validation failed)", block.index);
-                    println!("   Block hash: {}", &block.hash[..32]);
-                    println!("   Calculated: {}", &block.calculate_hash()[..32]);
+                    let block_hash_preview = if block.hash.len() > 32 { &block.hash[..32] } else { &block.hash };
+                    let calc_hash = block.calculate_hash();
+                    let calc_hash_preview = if calc_hash.len() > 32 { &calc_hash[..32] } else { &calc_hash };
+                    println!("   Block hash: {}", block_hash_preview);
+                    println!("   Calculated: {}", calc_hash_preview);
                     break;
                 }
             }
