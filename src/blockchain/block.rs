@@ -50,8 +50,8 @@ impl Block {
         miner_address: String,
     ) -> Self {
         let merkle_root = Self::calculate_merkle_root(&transactions);
-        
-        Block {
+
+        let mut block = Block {
             index,
             timestamp: Utc::now().timestamp(),
             transactions,
@@ -61,7 +61,11 @@ impl Block {
             difficulty,
             miner_address,
             merkle_root,
-        }
+        };
+
+        // Calculate the hash immediately so all blocks have valid hashes
+        block.hash = block.calculate_hash();
+        block
     }
 
     pub fn calculate_hash(&self) -> String {
