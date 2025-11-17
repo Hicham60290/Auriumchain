@@ -11,21 +11,27 @@ use std::net::SocketAddr;
 struct Args {
     #[arg(short = 'p', long, default_value = "3001")]
     port: u16,
-    
+
     #[arg(short = 'r', long = "rpc-port", default_value = "8001")]
     rpc_port: u16,
-    
+
     #[arg(short = 'g', long)]
     genesis: bool,
-    
+
     #[arg(short = 'm', long)]
     mining: bool,
-    
+
     #[arg(long)]
     peer: Option<String>,
-    
+
     #[arg(long, default_value = "/tmp/auriumchain.json")]
     data_file: String,
+
+    #[arg(short = 'w', long = "wallet", default_value = "AUR3ZnxihprBGetUiMoHwRWZbcyU94TzP52Jkk")]
+    wallet_address: String,
+
+    #[arg(short = 'h', long = "host", default_value = "127.0.0.1")]
+    bind_host: String,
 }
 
 #[tokio::main]
@@ -37,11 +43,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("AuriumChain Node - TLS P2P Edition");
     println!("Port P2P:  {}", args.port);
     println!("Port RPC:  {}", args.rpc_port);
+    println!("Bind Host: {}", args.bind_host);
     println!("Genesis:   {}", args.genesis);
     println!("Mining:    {}", args.mining);
+    println!("Wallet:    {}", args.wallet_address);
     println!("Data file: {}", args.data_file);
-    
-    let wallet_addr = "AUR3ZnxihprBGetUiMoHwRWZbcyU94TzP52Jkk".to_string();
+
+    let wallet_addr = args.wallet_address.clone();
     
     // Charger ou créer la blockchain
     let blockchain = if args.genesis {
@@ -103,11 +111,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sync_manager = Arc::new(SyncManager::new(blockchain.clone(), peer_manager.clone()));
     
     // Démarrer serveur P2P TLS
+    let bind_addr = format!("{}:{}", args.bind_host, args.port)
+        .parse::<SocketAddr>()
+        .expect("Invalid bind address");
+
     let p2p_server = P2PServer::new(
         blockchain.clone(),
         peer_manager.clone(),
         security.clone(),
-        SocketAddr::from(([0, 0, 0, 0], args.port))
+        bind_addr
     );
     
     tokio::spawn(async move {
@@ -156,10 +168,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let blockchain_mining = blockchain.clone();
     let data_file_mining = args.data_file.clone();
     let sync_manager_mining = sync_manager.clone();
-    
+    let bind_host_rpc = args.bind_host.clone();
+    let rpc_port = args.rpc_port;
+
     // Démarrer RPC
     tokio::spawn(async move {
-        if let Err(e) = start_rpc_server(blockchain_rpc, args.rpc_port).await {
+        if let Err(e) = start_rpc_server(blockchain_rpc, &bind_host_rpc, rpc_port).await {
             eprintln!("RPC error: {}", e);
         }
     });
@@ -221,8 +235,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     
-    println!("P2P Server (TLS) listening on 0.0.0.0:{}", args.port);
-    println!("RPC Server listening on http://0.0.0.0:{}", args.rpc_port);
+    println!("P2P Server (TLS) listening on {}:{}", args.bind_host, args.port);
+    println!("RPC Server listening on http://{}:{}", args.bind_host, args.rpc_port);
     println!("TLS P2P Node running! Press Ctrl+C to stop");
     
     // **NOUVELLE FONCTIONNALITÉ : Synchronisation initiale au démarrage**

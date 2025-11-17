@@ -5,11 +5,13 @@ use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub async fn start_rpc_server(
-    blockchain: Arc<RwLock<Blockchain>>, 
+    blockchain: Arc<RwLock<Blockchain>>,
+    host: &str,
     port: u16
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-    println!("RPC Server listening on http://0.0.0.0:{}", port);
+    let bind_addr = format!("{}:{}", host, port);
+    let listener = TcpListener::bind(&bind_addr).await?;
+    println!("RPC Server listening on http://{}", bind_addr);
     
     loop {
         if let Ok((stream, _)) = listener.accept().await {
