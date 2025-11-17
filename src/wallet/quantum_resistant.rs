@@ -1,21 +1,21 @@
+use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use hex;
 
 /// Types d'adresses supportés
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum AddressType {
-    Legacy,       // AUR1... (ECDSA secp256k1) - Standard actuel
-    QuantumSafe,  // AUR2... (Post-quantum) - Futur
-    Hybrid,       // AUR3... (ECDSA + PQ) - Transition
+    Legacy,      // AUR1... (ECDSA secp256k1) - Standard actuel
+    QuantumSafe, // AUR2... (Post-quantum) - Futur
+    Hybrid,      // AUR3... (ECDSA + PQ) - Transition
 }
 
 /// Version de la signature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SignatureVersion {
-    V1,  // ECDSA seule (actuel)
-    V2,  // Post-quantum seule (futur)
-    V3,  // Hybride (transition)
+    V1, // ECDSA seule (actuel)
+    V2, // Post-quantum seule (futur)
+    V3, // Hybride (transition)
 }
 
 /// Informations sur la protection quantique
@@ -23,7 +23,7 @@ pub enum SignatureVersion {
 pub struct QuantumResistanceInfo {
     pub is_quantum_safe: bool,
     pub algorithm: String,
-    pub security_level: u32,  // Bits de sécurité
+    pub security_level: u32,   // Bits de sécurité
     pub signature_size: usize, // Taille en bytes
 }
 
@@ -78,7 +78,7 @@ pub struct QuantumProtection {
 impl QuantumProtection {
     pub fn new() -> Self {
         QuantumProtection {
-            enabled: false,  // Désactivé par défaut (2025)
+            enabled: false,                      // Désactivé par défaut (2025)
             algorithm: "DILITHIUM3".to_string(), // Algorithme NIST recommandé
         }
     }
@@ -95,8 +95,8 @@ impl QuantumProtection {
             AddressType::Legacy => QuantumResistanceInfo {
                 is_quantum_safe: false,
                 algorithm: "ECDSA-secp256k1".to_string(),
-                security_level: 128,  // 128 bits contre attaques classiques
-                signature_size: 70,   // ~70 bytes
+                security_level: 128, // 128 bits contre attaques classiques
+                signature_size: 70,  // ~70 bytes
             },
             AddressType::QuantumSafe => QuantumResistanceInfo {
                 is_quantum_safe: true,
@@ -116,11 +116,11 @@ impl QuantumProtection {
     /// Recommandation de type d'adresse selon l'année
     pub fn recommend_address_type(&self, year: i32) -> AddressType {
         if year < 2028 {
-            AddressType::Legacy  // Avant 2028 : Legacy suffit
+            AddressType::Legacy // Avant 2028 : Legacy suffit
         } else if year < 2033 {
-            AddressType::Hybrid  // 2028-2033 : Transition vers hybride
+            AddressType::Hybrid // 2028-2033 : Transition vers hybride
         } else {
-            AddressType::QuantumSafe  // Après 2033 : Quantum-safe obligatoire
+            AddressType::QuantumSafe // Après 2033 : Quantum-safe obligatoire
         }
     }
 
@@ -153,22 +153,22 @@ impl AddressGenerator {
         // Hash de la clé publique
         let hash1 = Sha256::digest(public_key);
         let hash2 = Sha256::digest(&hash1);
-        
+
         // Prendre les 20 premiers bytes
         let hash160 = &hash2[0..20];
-        
+
         // Ajouter le byte de version
         let mut payload = vec![addr_type.version_byte()];
         payload.extend_from_slice(hash160);
-        
+
         // Calculer le checksum
         let checksum_hash = Sha256::digest(&Sha256::digest(&payload));
         let checksum = &checksum_hash[0..4];
         payload.extend_from_slice(checksum);
-        
+
         // Encoder en Base58
         let encoded = bs58::encode(payload).into_string();
-        
+
         // Ajouter le préfixe
         format!("{}{}", addr_type.prefix(), encoded)
     }
@@ -180,9 +180,18 @@ mod tests {
 
     #[test]
     fn test_address_type_detection() {
-        assert_eq!(AddressType::from_address("AUR1qxyz..."), Some(AddressType::Legacy));
-        assert_eq!(AddressType::from_address("AUR2qabc..."), Some(AddressType::QuantumSafe));
-        assert_eq!(AddressType::from_address("AUR3qdef..."), Some(AddressType::Hybrid));
+        assert_eq!(
+            AddressType::from_address("AUR1qxyz..."),
+            Some(AddressType::Legacy)
+        );
+        assert_eq!(
+            AddressType::from_address("AUR2qabc..."),
+            Some(AddressType::QuantumSafe)
+        );
+        assert_eq!(
+            AddressType::from_address("AUR3qdef..."),
+            Some(AddressType::Hybrid)
+        );
         assert_eq!(AddressType::from_address("BTC1..."), None);
     }
 
@@ -196,7 +205,7 @@ mod tests {
     #[test]
     fn test_recommendation_by_year() {
         let qp = QuantumProtection::new();
-        
+
         assert_eq!(qp.recommend_address_type(2025), AddressType::Legacy);
         assert_eq!(qp.recommend_address_type(2030), AddressType::Hybrid);
         assert_eq!(qp.recommend_address_type(2035), AddressType::QuantumSafe);
@@ -205,11 +214,11 @@ mod tests {
     #[test]
     fn test_security_info() {
         let qp = QuantumProtection::new();
-        
+
         let legacy_info = qp.get_security_info(AddressType::Legacy);
         assert_eq!(legacy_info.is_quantum_safe, false);
         assert_eq!(legacy_info.security_level, 128);
-        
+
         let quantum_info = qp.get_security_info(AddressType::QuantumSafe);
         assert_eq!(quantum_info.is_quantum_safe, true);
         assert_eq!(quantum_info.security_level, 192);
@@ -218,10 +227,10 @@ mod tests {
     #[test]
     fn test_warning_message() {
         let qp = QuantumProtection::new();
-        
+
         // Pas d'avertissement en 2025
         assert!(qp.get_warning(AddressType::Legacy, 2025).is_none());
-        
+
         // Avertissement en 2030
         assert!(qp.get_warning(AddressType::Legacy, 2030).is_some());
     }

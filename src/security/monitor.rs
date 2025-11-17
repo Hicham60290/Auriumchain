@@ -47,7 +47,11 @@ impl SecurityMonitor {
             self.add_alert(
                 AlertLevel::Warning,
                 "High transaction count",
-                format!("Block {} has {} transactions", block.index, block.transactions.len()),
+                format!(
+                    "Block {} has {} transactions",
+                    block.index,
+                    block.transactions.len()
+                ),
             );
         }
 
@@ -56,7 +60,10 @@ impl SecurityMonitor {
             self.add_alert(
                 AlertLevel::Info,
                 "Block mined quickly",
-                format!("Block {} mined with low nonce: {}", block.index, block.nonce),
+                format!(
+                    "Block {} mined with low nonce: {}",
+                    block.index, block.nonce
+                ),
             );
         }
     }
@@ -68,7 +75,11 @@ impl SecurityMonitor {
             self.add_alert(
                 AlertLevel::Warning,
                 "Large transaction detected",
-                format!("TX {} amount: {} AUR", tx.id, total_output as f64 / 100_000_000.0),
+                format!(
+                    "TX {} amount: {} AUR",
+                    tx.id,
+                    total_output as f64 / 100_000_000.0
+                ),
             );
         }
 
@@ -96,34 +107,37 @@ impl SecurityMonitor {
             self.add_alert(
                 AlertLevel::Critical,
                 "Potential 51% attack detected",
-                format!("Chain reorganization detected: {} -> {}", old_height, new_height),
+                format!(
+                    "Chain reorganization detected: {} -> {}",
+                    old_height, new_height
+                ),
             );
         }
     }
 
     fn add_alert(&mut self, level: AlertLevel, message: &str, details: String) {
-    let alert = SecurityAlert {
-        timestamp: Utc::now().timestamp(),
-        level: level.clone(),
-        message: message.to_string(),
-        details: details.clone(), // Clone ici
-    };
+        let alert = SecurityAlert {
+            timestamp: Utc::now().timestamp(),
+            level: level.clone(),
+            message: message.to_string(),
+            details: details.clone(), // Clone ici
+        };
 
-    // Log immédiatement
-    match level {
-        AlertLevel::Info => log::info!("ℹ️  {}: {}", message, &details),
-        AlertLevel::Warning => log::warn!("⚠️  {}: {}", message, &details),
-        AlertLevel::Critical => log::error!("🚨 CRITICAL: {}: {}", message, &details),
+        // Log immédiatement
+        match level {
+            AlertLevel::Info => log::info!("ℹ️  {}: {}", message, &details),
+            AlertLevel::Warning => log::warn!("⚠️  {}: {}", message, &details),
+            AlertLevel::Critical => log::error!("🚨 CRITICAL: {}: {}", message, &details),
+        }
+
+        // Stocker
+        self.alerts.push(alert);
+
+        // Limiter la taille
+        if self.alerts.len() > self.max_alerts {
+            self.alerts.remove(0);
+        }
     }
-
-    // Stocker
-    self.alerts.push(alert);
-
-    // Limiter la taille
-    if self.alerts.len() > self.max_alerts {
-        self.alerts.remove(0);
-    }
-}
 
     pub fn get_recent_alerts(&self, count: usize) -> Vec<SecurityAlert> {
         let start = if self.alerts.len() > count {

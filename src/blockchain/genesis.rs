@@ -20,7 +20,7 @@ pub fn create_genesis_block() -> Block {
     println!("║  Creator:   Anonymous                         ║");
     println!("║  Control:   NONE                              ║");
     println!("╚════════════════════════════════════════════════╝");
-    
+
     let genesis_message = "AuriumChain Genesis - October 20, 2025 - Autonomous & Decentralized";
 
     let genesis_tx = Transaction {
@@ -48,7 +48,7 @@ pub fn create_genesis_block() -> Block {
 
     genesis.merkle_root = Block::calculate_merkle_root(&genesis.transactions);
     genesis.mine();
-    
+
     println!("\n🌟 Genesis Block Created!");
     println!("   Hash: {}", genesis.hash);
     println!("\n✨ AuriumChain is now ALIVE and AUTONOMOUS!\n");
@@ -59,12 +59,12 @@ pub fn create_genesis_block() -> Block {
 pub fn calculate_block_reward(block_height: u64) -> u64 {
     const INITIAL_REWARD: u64 = 50_00000000;
     const HALVING_INTERVAL: u64 = 4_204_800;
-    
+
     let halvings = block_height / HALVING_INTERVAL;
-    
+
     if halvings >= 64 {
         return 0;
     }
-    
+
     INITIAL_REWARD >> halvings
 }

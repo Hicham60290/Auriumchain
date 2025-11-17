@@ -14,16 +14,16 @@ pub struct BlockEnergyStats {
 
 /// Calculateur d'énergie
 pub struct EnergyCalculator {
-    pub watts_per_mhash: f64,  // Watts par million de hashes
-    pub base_power: f64,       // Puissance de base (W)
+    pub watts_per_mhash: f64, // Watts par million de hashes
+    pub base_power: f64,      // Puissance de base (W)
 }
 
 impl EnergyCalculator {
     pub fn new() -> Self {
         EnergyCalculator {
             // Estimation pour CPU moderne (i5/i7)
-            watts_per_mhash: 0.5,  // 0.5W par MHash/s
-            base_power: 50.0,      // 50W de base
+            watts_per_mhash: 0.5, // 0.5W par MHash/s
+            base_power: 50.0,     // 50W de base
         }
     }
 
@@ -36,10 +36,10 @@ impl EnergyCalculator {
         // Calculer le hashrate (hashes/seconde)
         let hashrate = hash_attempts as f64 / duration_secs;
         let hashrate_mh = hashrate / 1_000_000.0; // Convertir en MH/s
-        
+
         // Puissance estimée
         let mining_power = self.base_power + (hashrate_mh * self.watts_per_mhash);
-        
+
         // Énergie consommée (Wh)
         let energy_wh = mining_power * (duration_secs / 3600.0);
 
@@ -57,10 +57,10 @@ impl EnergyCalculator {
     pub fn estimate_energy_for_difficulty(&self, difficulty: u32) -> f64 {
         // Nombre approximatif de hashes nécessaires
         let expected_hashes = 2u64.pow(difficulty);
-        
+
         // Temps estimé (en supposant 1 MH/s)
         let estimated_secs = expected_hashes as f64 / 1_000_000.0;
-        
+
         // Énergie (Wh)
         self.base_power * (estimated_secs / 3600.0)
     }
@@ -125,9 +125,9 @@ impl EnergyTracker {
 
         EnergyComparison {
             auriumchain_wh_per_tx: energy_per_tx,
-            bitcoin_wh_per_tx: 150_000.0,      // ~150 kWh
-            ethereum_pow_wh_per_tx: 60_000.0,   // ~60 kWh
-            ethereum_pos_wh_per_tx: 10.0,       // ~0.01 kWh
+            bitcoin_wh_per_tx: 150_000.0,     // ~150 kWh
+            ethereum_pow_wh_per_tx: 60_000.0, // ~60 kWh
+            ethereum_pos_wh_per_tx: 10.0,     // ~0.01 kWh
         }
     }
 
@@ -138,21 +138,43 @@ impl EnergyTracker {
         println!("╠════════════════════════════════════════════════╣");
         println!("║                                                ║");
         println!("║  Blocs minés : {:<32} ║", self.total_blocks_mined);
-        println!("║  Énergie totale : {:<25.2} kWh ║", self.total_energy_kwh());
-        println!("║  Énergie/bloc : {:<27.4} Wh ║", self.average_energy_per_block());
-        println!("║  Temps total : {:<26.1} heures ║", self.total_mining_time_secs / 3600.0);
+        println!(
+            "║  Énergie totale : {:<25.2} kWh ║",
+            self.total_energy_kwh()
+        );
+        println!(
+            "║  Énergie/bloc : {:<27.4} Wh ║",
+            self.average_energy_per_block()
+        );
+        println!(
+            "║  Temps total : {:<26.1} heures ║",
+            self.total_mining_time_secs / 3600.0
+        );
         println!("║  Hashes totaux : {:<30} ║", self.total_hash_attempts);
         println!("║                                                ║");
-        
+
         let comparison = self.compare_with_others();
         println!("║  🌍 COMPARAISON (par transaction) :           ║");
-        println!("║  ├─ AuriumChain : {:<26.4} Wh ║", comparison.auriumchain_wh_per_tx);
-        println!("║  ├─ Bitcoin : {:<30.0} Wh ║", comparison.bitcoin_wh_per_tx);
-        println!("║  ├─ Ethereum PoW : {:<25.0} Wh ║", comparison.ethereum_pow_wh_per_tx);
-        println!("║  └─ Ethereum PoS : {:<26.1} Wh ║", comparison.ethereum_pos_wh_per_tx);
+        println!(
+            "║  ├─ AuriumChain : {:<26.4} Wh ║",
+            comparison.auriumchain_wh_per_tx
+        );
+        println!(
+            "║  ├─ Bitcoin : {:<30.0} Wh ║",
+            comparison.bitcoin_wh_per_tx
+        );
+        println!(
+            "║  ├─ Ethereum PoW : {:<25.0} Wh ║",
+            comparison.ethereum_pow_wh_per_tx
+        );
+        println!(
+            "║  └─ Ethereum PoS : {:<26.1} Wh ║",
+            comparison.ethereum_pos_wh_per_tx
+        );
         println!("║                                                ║");
-        
-        let reduction_vs_btc = (1.0 - comparison.auriumchain_wh_per_tx / comparison.bitcoin_wh_per_tx) * 100.0;
+
+        let reduction_vs_btc =
+            (1.0 - comparison.auriumchain_wh_per_tx / comparison.bitcoin_wh_per_tx) * 100.0;
         println!("║  ✅ Réduction vs Bitcoin : {:<17.1}% ║", reduction_vs_btc);
         println!("║                                                ║");
         println!("╚════════════════════════════════════════════════╝\n");
@@ -180,13 +202,13 @@ mod tests {
     #[test]
     fn test_energy_calculation() {
         let calc = EnergyCalculator::new();
-        
+
         // 1 million de hashes en 1 seconde
         let stats = calc.calculate_block_energy(1_000_000, 1.0);
-        
+
         assert!(stats.estimated_watts > 0.0);
         assert!(stats.estimated_wh > 0.0);
-        
+
         println!("Puissance: {} W", stats.estimated_watts);
         println!("Énergie: {} Wh", stats.estimated_wh);
     }
@@ -194,7 +216,7 @@ mod tests {
     #[test]
     fn test_tracker() {
         let mut tracker = EnergyTracker::new();
-        
+
         // Enregistrer 3 blocs
         for i in 0..3 {
             let stats = BlockEnergyStats {
@@ -207,10 +229,10 @@ mod tests {
             };
             tracker.record_block(stats);
         }
-        
+
         assert_eq!(tracker.total_blocks_mined, 3);
         assert!(tracker.total_energy_wh > 0.0);
-        
+
         tracker.print_stats();
     }
 
@@ -219,9 +241,9 @@ mod tests {
         let mut tracker = EnergyTracker::new();
         tracker.total_blocks_mined = 100;
         tracker.total_energy_wh = 500.0; // 500 Wh pour 100 blocs
-        
+
         let comparison = tracker.compare_with_others();
-        
+
         // AuriumChain devrait être beaucoup plus efficace que Bitcoin
         assert!(comparison.auriumchain_wh_per_tx < comparison.bitcoin_wh_per_tx / 1000.0);
     }

@@ -1,5 +1,5 @@
-use sha2::{Digest, Sha256};
 use crate::blockchain::Block;
+use sha2::{Digest, Sha256};
 
 pub struct ProofOfWork {
     pub difficulty: u32,
@@ -26,13 +26,13 @@ impl ProofOfWork {
 
         let recent = &blocks[blocks.len().saturating_sub(100)..];
         let time_span = recent.last().unwrap().timestamp - recent.first().unwrap().timestamp;
-        
+
         if time_span == 0 {
             return 0.0;
         }
 
         let total_work: u64 = recent.iter().map(|b| 1u64 << b.difficulty).sum();
-        
+
         (total_work as f64) / (time_span as f64)
     }
 }
