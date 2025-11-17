@@ -5,8 +5,14 @@ use chrono::Utc;
 /// Helper function to create a genesis block and blockchain for testing
 fn setup_blockchain() -> Blockchain {
     let mut blockchain = Blockchain::new();
+
+    // Create a deterministic genesis block for testing
     let mut genesis = Block::new(0, vec![], "0".to_string(), 4, "AUR_GENESIS".to_string());
+
+    // Set a fixed timestamp for deterministic testing
+    genesis.timestamp = 1704067200; // Fixed timestamp: 2024-01-01 00:00:00 UTC
     genesis.mine(); // Mine the genesis block
+
     blockchain.add_block_unchecked(genesis);
     blockchain
 }
