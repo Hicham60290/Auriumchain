@@ -1,18 +1,12 @@
-use auriumchain::blockchain::{Blockchain, Block, Transaction, TxOutput};
 use auriumchain::blockchain::genesis::calculate_block_reward;
+use auriumchain::blockchain::{Block, Blockchain, Transaction, TxOutput};
 use chrono::Utc;
 
 /// Helper function to create a genesis block and blockchain for testing
 fn setup_blockchain() -> Blockchain {
     let mut blockchain = Blockchain::new();
-    let mut genesis = Block::new(
-        0,
-        vec![],
-        "0".to_string(),
-        4,
-        "AUR_GENESIS".to_string(),
-    );
-    genesis.mine();  // Mine the genesis block
+    let mut genesis = Block::new(0, vec![], "0".to_string(), 4, "AUR_GENESIS".to_string());
+    genesis.mine(); // Mine the genesis block
     blockchain.add_block_unchecked(genesis);
     blockchain
 }
@@ -66,13 +60,16 @@ fn test_reject_excessive_mining_reward() {
         vec![malicious_coinbase],
         latest.hash.clone(),
         4,
-        "HACKER".to_string()
+        "HACKER".to_string(),
     );
 
     bad_block.mine();
     let result = blockchain.add_block(bad_block);
 
-    assert!(result.is_err(), "❌ CRITICAL: Excessive reward was ACCEPTED!");
+    assert!(
+        result.is_err(),
+        "❌ CRITICAL: Excessive reward was ACCEPTED!"
+    );
     assert!(result.unwrap_err().contains("Excessive mining reward"));
     println!("✅ Test 1 PASSED: Excessive reward rejected");
 }
@@ -99,7 +96,7 @@ fn test_reject_invalid_pow() {
         vec![coinbase],
         latest.hash.clone(),
         4,
-        "Miner".to_string()
+        "Miner".to_string(),
     );
 
     // Tamper with hash (invalid PoW)
@@ -134,13 +131,16 @@ fn test_reject_wrong_previous_hash() {
         vec![coinbase],
         "0000WRONG_HASH".to_string(),
         4,
-        "Miner".to_string()
+        "Miner".to_string(),
     );
 
     bad_block.mine();
     let result = blockchain.add_block(bad_block);
 
-    assert!(result.is_err(), "❌ CRITICAL: Wrong previous hash accepted!");
+    assert!(
+        result.is_err(),
+        "❌ CRITICAL: Wrong previous hash accepted!"
+    );
     assert!(result.unwrap_err().contains("Previous hash"));
     println!("✅ Test 3 PASSED: Wrong previous hash rejected");
 }
@@ -157,8 +157,10 @@ fn test_genesis_immutability() {
     // Don't recalculate hash - this makes it invalid
 
     // The tampered chain should be invalid
-    assert!(!blockchain_tampered.is_chain_valid(),
-            "❌ CRITICAL: Genesis block with wrong hash was accepted!");
+    assert!(
+        !blockchain_tampered.is_chain_valid(),
+        "❌ CRITICAL: Genesis block with wrong hash was accepted!"
+    );
 
     // Verify that modifying genesis changes the hash (even if recalculated)
     let mut blockchain2 = setup_blockchain();
@@ -166,8 +168,10 @@ fn test_genesis_immutability() {
     blockchain2.chain[0].hash = blockchain2.chain[0].calculate_hash();
 
     // The hash should be different after modification
-    assert_ne!(blockchain2.chain[0].hash, original_genesis_hash,
-               "❌ CRITICAL: Genesis hash unchanged after modification!");
+    assert_ne!(
+        blockchain2.chain[0].hash, original_genesis_hash,
+        "❌ CRITICAL: Genesis hash unchanged after modification!"
+    );
 
     println!("✅ Test 4 PASSED: Genesis immutability verified");
 }
@@ -190,11 +194,11 @@ fn test_reject_wrong_index() {
     };
 
     let mut bad_block = Block::new(
-        99,  // Wrong index
+        99, // Wrong index
         vec![coinbase],
         latest.hash.clone(),
         4,
-        "Miner".to_string()
+        "Miner".to_string(),
     );
 
     bad_block.mine();
@@ -212,10 +216,15 @@ fn test_blockchain_validity_after_multiple_blocks() {
 
     for i in 1..=5 {
         let block = mine_valid_block(&blockchain, &format!("Miner_{}", i));
-        blockchain.add_block(block).expect("Failed to add valid block");
+        blockchain
+            .add_block(block)
+            .expect("Failed to add valid block");
     }
 
-    assert!(blockchain.is_chain_valid(), "❌ CRITICAL: Blockchain became invalid!");
+    assert!(
+        blockchain.is_chain_valid(),
+        "❌ CRITICAL: Blockchain became invalid!"
+    );
     assert_eq!(blockchain.chain.len(), 6); // Genesis + 5 blocks
 
     println!("✅ Test 6 PASSED: Blockchain stays valid after multiple blocks");
@@ -271,7 +280,10 @@ fn test_difficulty_respected() {
     let latest = blockchain.get_latest_block().expect("No latest block");
     let target = "0".repeat(blockchain.difficulty);
 
-    assert!(latest.hash.starts_with(&target), "❌ CRITICAL: Block doesn't meet difficulty!");
+    assert!(
+        latest.hash.starts_with(&target),
+        "❌ CRITICAL: Block doesn't meet difficulty!"
+    );
 
     println!("✅ Test 9 PASSED: Difficulty respected");
 }
@@ -283,12 +295,16 @@ fn test_stress_20_blocks() {
 
     for i in 1..=20 {
         let block = mine_valid_block(&blockchain, &format!("Miner_{}", i % 3));
-        blockchain.add_block(block)
+        blockchain
+            .add_block(block)
             .expect(&format!("Failed to add block {}", i));
     }
 
     assert_eq!(blockchain.chain.len(), 21); // Genesis + 20
-    assert!(blockchain.is_chain_valid(), "❌ CRITICAL: Chain invalid after stress test!");
+    assert!(
+        blockchain.is_chain_valid(),
+        "❌ CRITICAL: Chain invalid after stress test!"
+    );
 
     println!("✅ Test 10 PASSED: Stress test with 20 blocks succeeded");
 }

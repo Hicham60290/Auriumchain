@@ -32,7 +32,8 @@ impl NetworkProtection {
             .as_secs();
 
         // Récupérer ou créer l'historique
-        let history = self.request_history
+        let history = self
+            .request_history
             .entry(ip.to_string())
             .or_insert_with(Vec::new);
 
@@ -43,16 +44,17 @@ impl NetworkProtection {
         if history.len() >= self.max_requests_per_minute {
             log::warn!(
                 "⚠️  Rate limit exceeded for IP {}: {} requests/min",
-                ip, history.len()
+                ip,
+                history.len()
             );
-            
+
             // Blacklist après 3 violations
             let violation_count = history.len() - self.max_requests_per_minute;
             if violation_count >= 3 {
                 self.blacklist.push(ip.to_string());
                 log::error!("🚨 IP {} added to blacklist", ip);
             }
-            
+
             return false;
         }
 
@@ -73,9 +75,7 @@ impl NetworkProtection {
         ProtectionStats {
             blacklisted_ips: self.blacklist.len(),
             monitored_ips: self.request_history.len(),
-            total_requests: self.request_history.values()
-                .map(|h| h.len())
-                .sum(),
+            total_requests: self.request_history.values().map(|h| h.len()).sum(),
         }
     }
 }

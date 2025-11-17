@@ -14,7 +14,7 @@ enum Commands {
     Generate {
         #[arg(short, long)]
         name: String,
-        
+
         #[arg(short, long, default_value = "AUR3")]
         type_addr: String,
     },
@@ -58,15 +58,15 @@ fn generate_secure_wallet(name: &str, addr_type: &str) {
 
     println!("🔑 Enter a STRONG password (min 16 characters):");
     let password = rpassword::prompt_password("Password: ").unwrap();
-    
+
     if password.len() < 16 {
         println!("❌ Password too weak! Minimum 16 characters required.");
         return;
     }
-    
+
     println!("🔑 Confirm password:");
     let confirm = rpassword::prompt_password("Password: ").unwrap();
-    
+
     if password != confirm {
         println!("❌ Passwords don't match!");
         return;
@@ -86,10 +86,10 @@ fn generate_secure_wallet(name: &str, addr_type: &str) {
         Ok(filename) => {
             println!("\n✅ Wallet saved: {}\n", filename);
             wallet.security_info();
-            
+
             println!("📍 Your Address:");
             println!("   {}\n", wallet.address);
-            
+
             println!("⚠️  SECURITY REMINDERS:");
             println!("   1. Your seed phrase is your ULTIMATE backup");
             println!("   2. NEVER share your password or seed");
@@ -103,7 +103,7 @@ fn generate_secure_wallet(name: &str, addr_type: &str) {
 
 fn show_wallet(name: &str) {
     let filename = format!("wallets/{}.secure.wallet", name);
-    
+
     let wallet = match SecureWallet::load(&filename) {
         Ok(w) => w,
         Err(e) => {
@@ -117,13 +117,16 @@ fn show_wallet(name: &str) {
     println!("╠════════════════════════════════════════════════╣");
     println!("║  Name    : {:<38} ║", wallet.name);
     println!("║  Type    : {:<38} ║", wallet.address_type);
-    println!("║  Address : {:<38} ║", &wallet.address[..40.min(wallet.address.len())]);
+    println!(
+        "║  Address : {:<38} ║",
+        &wallet.address[..40.min(wallet.address.len())]
+    );
     if wallet.address.len() > 40 {
         println!("║            {:<38} ║", &wallet.address[40..]);
     }
     println!("║  Created : {:<38} ║", &wallet.created_at[..19]);
     println!("╚════════════════════════════════════════════════╝\n");
-    
+
     wallet.security_info();
 }
 
@@ -131,11 +134,11 @@ fn export_seed(name: &str) {
     println!("\n⚠️  WARNING: You are about to export your SEED PHRASE!");
     println!("⚠️  This is the MOST SENSITIVE information!");
     println!("⚠️  Make sure nobody is watching your screen!\n");
-    
+
     println!("Type 'I UNDERSTAND THE RISKS' to continue:");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
-    
+
     if input.trim() != "I UNDERSTAND THE RISKS" {
         println!("❌ Cancelled.");
         return;
@@ -159,7 +162,7 @@ fn export_seed(name: &str) {
             println!("║              🔐 SEED PHRASE 🔐                 ║");
             println!("╠════════════════════════════════════════════════╣");
             println!("║                                                ║");
-            
+
             let words: Vec<&str> = seed.split_whitespace().collect();
             for (i, word) in words.iter().enumerate() {
                 if i % 4 == 0 {
@@ -170,7 +173,7 @@ fn export_seed(name: &str) {
                     println!("║");
                 }
             }
-            
+
             println!("║                                                ║");
             println!("╚════════════════════════════════════════════════╝\n");
         }
@@ -180,7 +183,7 @@ fn export_seed(name: &str) {
 
 fn verify_wallet(name: &str) {
     let filename = format!("wallets/{}.secure.wallet", name);
-    
+
     let wallet = match SecureWallet::load(&filename) {
         Ok(w) => w,
         Err(e) => {

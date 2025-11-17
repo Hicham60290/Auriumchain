@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::blockchain::{Block, Transaction};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
@@ -26,7 +26,8 @@ impl Blockchain {
         }
 
         // Get the latest block for validation
-        let latest_block = self.get_latest_block()
+        let latest_block = self
+            .get_latest_block()
             .ok_or_else(|| "Blockchain is empty, cannot add block".to_string())?;
 
         // SECURITY: Validate block index is sequential
@@ -63,13 +64,13 @@ impl Blockchain {
             if coinbase.inputs.is_empty() {
                 // This is a coinbase transaction, validate the reward
                 let total_output: u64 = coinbase.outputs.iter().map(|o| o.value).sum();
-                let expected_reward = crate::blockchain::genesis::calculate_block_reward(block.index as u64);
+                let expected_reward =
+                    crate::blockchain::genesis::calculate_block_reward(block.index as u64);
 
                 if total_output > expected_reward {
                     return Err(format!(
                         "Excessive mining reward: got {}, expected max {}",
-                        total_output,
-                        expected_reward
+                        total_output, expected_reward
                     ));
                 }
             }
@@ -116,9 +117,11 @@ impl Blockchain {
     }
 
     pub fn get_balance(&self, address: &str) -> u64 {
-        self.chain.iter()
+        self.chain
+            .iter()
             .filter(|block| block.miner_address == address)
-            .count() as u64 * 50
+            .count() as u64
+            * 50
     }
 
     pub fn get_chain_length(&self) -> usize {
@@ -138,7 +141,7 @@ impl Blockchain {
             if block.index != latest_block.index + 1 {
                 return false;
             }
-            
+
             if block.previous_hash != latest_block.hash {
                 return false;
             }
@@ -150,7 +153,7 @@ impl Blockchain {
 
 pub fn create_genesis_block() -> Block {
     use crate::blockchain::{TxInput, TxOutput};
-    
+
     let genesis_tx = Transaction::new(
         vec![TxInput {
             prev_tx_id: "0".to_string(),
@@ -161,7 +164,7 @@ pub fn create_genesis_block() -> Block {
         vec![TxOutput {
             address: "AUR3ZnxihprBGetUiMoHwRWZbcyU94TzP52Jkk".to_string(),
             value: 50,
-        }]
+        }],
     );
 
     Block::new(

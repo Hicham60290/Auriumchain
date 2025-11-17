@@ -1,23 +1,23 @@
 use crate::blockchain::Blockchain;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SyncMessage {
     RequestChainInfo,
-    ChainInfo { 
-        height: u64, 
-        latest_hash: String 
+    ChainInfo {
+        height: u64,
+        latest_hash: String,
     },
-    RequestBlocks { 
-        from_height: u64 
+    RequestBlocks {
+        from_height: u64,
     },
-    SendBlocks { 
-        blocks: Vec<crate::blockchain::Block> 
+    SendBlocks {
+        blocks: Vec<crate::blockchain::Block>,
     },
-    NewBlock { 
-        block: crate::blockchain::Block 
+    NewBlock {
+        block: crate::blockchain::Block,
     },
 }
 
@@ -42,7 +42,10 @@ pub struct SyncManager {
 }
 
 impl SyncManager {
-    pub fn new(blockchain: Arc<RwLock<Blockchain>>, peer_manager: Arc<crate::p2p::PeerManager>) -> Self {
+    pub fn new(
+        blockchain: Arc<RwLock<Blockchain>>,
+        peer_manager: Arc<crate::p2p::PeerManager>,
+    ) -> Self {
         Self {
             blockchain,
             peer_manager,
@@ -50,27 +53,33 @@ impl SyncManager {
         }
     }
 
-    pub async fn broadcast_new_block(&self, block: crate::blockchain::Block) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn broadcast_new_block(
+        &self,
+        block: crate::blockchain::Block,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let peers = self.peer_manager.get_all_peers().await;
-        
+
         for peer_addr in peers {
             match self.send_block_to_peer(peer_addr, &block).await {
                 Ok(_) => println!("✅ Block sent to peer: {}", peer_addr),
                 Err(e) => println!("❌ Failed to send block to peer {}: {}", peer_addr, e),
             }
         }
-        
+
         Ok(())
     }
-    
-    pub async fn sync_with_peer(&self, peer_addr: std::net::SocketAddr) -> Result<bool, Box<dyn std::error::Error>> {
+
+    pub async fn sync_with_peer(
+        &self,
+        peer_addr: std::net::SocketAddr,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         println!("🔄 Starting sync with peer: {}", peer_addr);
-        
+
         let our_height = {
             let chain = self.blockchain.read().await;
             chain.get_chain_length()
         };
-        
+
         // Vraie requête HTTP pour obtenir la hauteur du peer
         let peer_height = match self.get_peer_chain_height(peer_addr).await {
             Ok(height) => height,
@@ -79,12 +88,18 @@ impl SyncManager {
                 return Ok(false);
             }
         };
-        
-        println!("📊 Heights - Us: {}, Peer {}: {}", our_height, peer_addr, peer_height);
-        
+
+        println!(
+            "📊 Heights - Us: {}, Peer {}: {}",
+            our_height, peer_addr, peer_height
+        );
+
         if peer_height > our_height {
-            println!("⬇️ Peer {} has longer chain ({} vs {}), downloading blocks...", peer_addr, peer_height, our_height);
-            
+            println!(
+                "⬇️ Peer {} has longer chain ({} vs {}), downloading blocks...",
+                peer_addr, peer_height, our_height
+            );
+
             // Vraie requête HTTP pour télécharger les blocs
             let new_blocks = match self.download_blocks_from_peer(peer_addr, our_height).await {
                 Ok(blocks) => blocks,
@@ -93,16 +108,16 @@ impl SyncManager {
                     return Ok(false);
                 }
             };
-            
+
             if new_blocks.is_empty() {
                 println!("⚠️ No blocks received from peer");
                 return Ok(false);
             }
-            
+
             // Appliquer les nouveaux blocs
             let mut chain = self.blockchain.write().await;
             let mut applied_blocks = 0;
-            
+
             for block in new_blocks {
                 if chain.validate_new_block(&block) {
                     chain.chain.push(block);
@@ -112,92 +127,124 @@ impl SyncManager {
                     break;
                 }
             }
-            
+
             if applied_blocks > 0 {
                 // Sauvegarder la blockchain mise à jour
                 if let Err(e) = chain.save_to_file("/tmp/auriumchain.json") {
                     println!("⚠️ Failed to save updated blockchain: {}", e);
                 }
-                
-                println!("✅ Successfully synchronized {} new blocks from {}", applied_blocks, peer_addr);
+
+                println!(
+                    "✅ Successfully synchronized {} new blocks from {}",
+                    applied_blocks, peer_addr
+                );
                 return Ok(true);
             }
         } else if peer_height < our_height {
-            println!("⬆️ We have longer chain ({} vs {}), peer should sync from us", our_height, peer_height);
+            println!(
+                "⬆️ We have longer chain ({} vs {}), peer should sync from us",
+                our_height, peer_height
+            );
         } else {
             println!("✅ Chains are in sync ({} blocks)", our_height);
         }
-        
+
         Ok(false)
     }
-    
+
     // Vraie requête HTTP pour obtenir la hauteur de chaîne du peer
-    async fn get_peer_chain_height(&self, peer_addr: std::net::SocketAddr) -> Result<usize, Box<dyn std::error::Error>> {
+    async fn get_peer_chain_height(
+        &self,
+        peer_addr: std::net::SocketAddr,
+    ) -> Result<usize, Box<dyn std::error::Error>> {
         let rpc_port = self.get_rpc_port_for_peer(peer_addr);
         let url = format!("http://{}:{}/status", peer_addr.ip(), rpc_port);
-        
+
         println!("🌐 Requesting status from: {}", url);
-        
+
         let response = tokio::time::timeout(
             std::time::Duration::from_secs(10),
-            self.client.get(&url).send()
-        ).await??;
-        
+            self.client.get(&url).send(),
+        )
+        .await??;
+
         if !response.status().is_success() {
             return Err(format!("HTTP error: {}", response.status()).into());
         }
-        
+
         let status: PeerStatus = response.json().await?;
-        
-        println!("📡 Peer {} status: {} blocks", peer_addr, status.block_height);
-        
+
+        println!(
+            "📡 Peer {} status: {} blocks",
+            peer_addr, status.block_height
+        );
+
         Ok(status.block_height as usize)
     }
-    
+
     // Vraie requête HTTP pour télécharger les blocs depuis un peer
-    async fn download_blocks_from_peer(&self, peer_addr: std::net::SocketAddr, from_height: usize) -> Result<Vec<crate::blockchain::Block>, Box<dyn std::error::Error>> {
+    async fn download_blocks_from_peer(
+        &self,
+        peer_addr: std::net::SocketAddr,
+        from_height: usize,
+    ) -> Result<Vec<crate::blockchain::Block>, Box<dyn std::error::Error>> {
         let rpc_port = self.get_rpc_port_for_peer(peer_addr);
-        let url = format!("http://{}:{}/blocks_from/{}", peer_addr.ip(), rpc_port, from_height);
-        
+        let url = format!(
+            "http://{}:{}/blocks_from/{}",
+            peer_addr.ip(),
+            rpc_port,
+            from_height
+        );
+
         println!("⬇️ Downloading blocks from: {}", url);
-        
+
         let response = tokio::time::timeout(
             std::time::Duration::from_secs(30),
-            self.client.get(&url).send()
-        ).await??;
-        
+            self.client.get(&url).send(),
+        )
+        .await??;
+
         if !response.status().is_success() {
             return Err(format!("HTTP error: {}", response.status()).into());
         }
-        
+
         let blocks: Vec<crate::blockchain::Block> = response.json().await?;
-        
-        println!("📦 Downloaded {} blocks from peer {}", blocks.len(), peer_addr);
-        
+
+        println!(
+            "📦 Downloaded {} blocks from peer {}",
+            blocks.len(),
+            peer_addr
+        );
+
         Ok(blocks)
     }
-    
+
     // Envoyer un nouveau bloc à un peer (pour le broadcasting)
-    async fn send_block_to_peer(&self, peer_addr: std::net::SocketAddr, block: &crate::blockchain::Block) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_block_to_peer(
+        &self,
+        peer_addr: std::net::SocketAddr,
+        block: &crate::blockchain::Block,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let rpc_port = self.get_rpc_port_for_peer(peer_addr);
         let url = format!("http://{}:{}/new_block", peer_addr.ip(), rpc_port);
-        
+
         let response = tokio::time::timeout(
             std::time::Duration::from_secs(10),
-            self.client.post(&url).json(block).send()
-        ).await;
-        
+            self.client.post(&url).json(block).send(),
+        )
+        .await;
+
         match response {
             Ok(Ok(resp)) if resp.status().is_success() => {
                 println!("📤 Block sent to peer: {}", peer_addr);
                 Ok(())
-            },
+            }
             Ok(Ok(resp)) => Err(format!("HTTP error: {}", resp.status()).into()),
             Ok(Err(e)) => Err(e.into()),
             Err(_) => Err("Request timeout".into()),
         }
     }
-    
+
     // Obtenir le port RPC basé sur le port P2P
     fn get_rpc_port_for_peer(&self, peer_addr: std::net::SocketAddr) -> u16 {
         match peer_addr.port() {

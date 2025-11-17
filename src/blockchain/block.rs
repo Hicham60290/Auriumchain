@@ -1,7 +1,7 @@
+use chrono::Utc;
+use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use hex;
-use chrono::Utc;
 use std::time::Instant;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,7 +49,7 @@ impl Block {
         miner_address: String,
     ) -> Self {
         let merkle_root = Self::calculate_merkle_root(&transactions);
-        
+
         Block {
             index,
             timestamp: Utc::now().timestamp(),
@@ -73,7 +73,7 @@ impl Block {
             self.nonce,
             self.miner_address
         );
-        
+
         let hash1 = Sha256::digest(data.as_bytes());
         let hash2 = Sha256::digest(&hash1);
         hex::encode(hash2)
@@ -82,12 +82,15 @@ impl Block {
     pub fn mine(&mut self) {
         let target = "0".repeat(self.difficulty as usize);
         let start = Instant::now();
-        
-        println!("⛏️  Mining block {} (difficulty {})...", self.index, self.difficulty);
-        
+
+        println!(
+            "⛏️  Mining block {} (difficulty {})...",
+            self.index, self.difficulty
+        );
+
         loop {
             self.hash = self.calculate_hash();
-            
+
             if self.hash.starts_with(&target) {
                 let duration = start.elapsed();
                 println!("✅ Block {} mined in {}s!", self.index, duration.as_secs());
@@ -95,7 +98,7 @@ impl Block {
                 println!("   Nonce: {}", self.nonce);
                 break;
             }
-            
+
             self.nonce += 1;
         }
     }
