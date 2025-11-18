@@ -132,20 +132,45 @@ cargo test
 ./target/release/auriumchain
 ```
 
-### Run a Node
+### 🌐 Join the Network & Start Mining
+
+**AuriumChain operates a globally distributed network of bootstrap nodes.**
+
+Connect to any official node to join the network:
 
 ```bash
-# Start a mining node
-./target/release/auriumchain --mining
+# 🇩🇪 Connect to Germany node (recommended for Europe)
+./target/release/auriumchain \
+  --mining \
+  --wallet YOUR_AUR_ADDRESS \
+  --peer [DE_NODE_IP]:3001
 
-# Start a node on custom ports
+# 🇨🇦 Connect to Canada node (recommended for Americas)
+./target/release/auriumchain \
+  --mining \
+  --wallet YOUR_AUR_ADDRESS \
+  --peer [CA_NODE_IP]:3001
+
+# 🇮🇹 Connect to Milan node (recommended for South Europe)
+./target/release/auriumchain \
+  --mining \
+  --wallet YOUR_AUR_ADDRESS \
+  --peer [IT_NODE_IP]:3001
+```
+
+**📋 See [BOOTSTRAP_NODES.md](BOOTSTRAP_NODES.md) for complete node list with IPs and locations.**
+
+### Run a Standalone Node (Advanced)
+
+```bash
+# Start a local mining node (not connected to network)
+./target/release/auriumchain --mining --wallet YOUR_ADDRESS
+
+# Start with custom ports
 ./target/release/auriumchain --port 3001 --rpc-port 8001
 
-# Connect to a peer
-./target/release/auriumchain --peer 192.168.1.100:8333
-
-# Run multiple peers
-./target/release/auriumchain --mining --port 3001 --rpc-port 8001 --peer PEER_IP:PORT
+# Create your own genesis block
+./target/release/auriumchain --genesis --mining
 ```
 
 ### Create a Wallet
