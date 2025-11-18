@@ -143,19 +143,19 @@ Connect to any official node to join the network:
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [DE_NODE_IP]:3001
+  --peer 135.125.174.27:3001
 
 # 🇨🇦 Connect to Canada node (recommended for Americas)
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [CA_NODE_IP]:3001
+  --peer 158.69.1.236:3001
 
 # 🇮🇹 Connect to Milan node (recommended for South Europe)
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [IT_NODE_IP]:3001
+  --peer 57.131.22.120:3001
 ```
 
 **📋 See [BOOTSTRAP_NODES.md](BOOTSTRAP_NODES.md) for complete node list with IPs and locations.**

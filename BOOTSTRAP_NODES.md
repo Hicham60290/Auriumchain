@@ -8,16 +8,16 @@ AuriumChain operates a globally distributed network of bootstrap nodes. Connect 
 
 ## 🌍 Available Nodes
 
-### 🇩🇪 Node 1 - Germany (Primary)
-- **IP**: `[À REMPLACER PAR IP VPS1]`
+### 🇩🇪 Node 1 - Frankfurt, Germany (Primary)
+- **IP**: `135.125.174.27`
 - **P2P Port**: 3001
 - **RPC Port**: 8001
 - **Location**: Germany 🇩🇪
 - **Uptime**: 99.9%
 - **Status**: ✅ Online
 
-### 🇨🇦 Node 2 - Canada
-- **IP**: `[À REMPLACER PAR IP VPS2]`
+### 🇨🇦 Node 2 - Beauharnois, Canada
+- **IP**: `158.69.1.236`
 - **P2P Port**: 3001
 - **RPC Port**: 8001
 - **Location**: Canada 🇨🇦
@@ -25,7 +25,7 @@ AuriumChain operates a globally distributed network of bootstrap nodes. Connect 
 - **Status**: ✅ Online
 
 ### 🇮🇹 Node 3 - Milan, Italy
-- **IP**: `[À REMPLACER PAR IP VPS3]`
+- **IP**: `57.131.22.120`
 - **P2P Port**: 3001
 - **RPC Port**: 8001
 - **Location**: Milan, Italy 🇮🇹
@@ -52,19 +52,19 @@ cargo build --release
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [IP_VPS1]:3001
+  --peer 135.125.174.27:3001
 
 # OR connect to Canada node (recommended for Americas)
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [IP_VPS2]:3001
+  --peer 158.69.1.236:3001
 
 # OR connect to Milan node (recommended for Europe/Mediterranean)
 ./target/release/auriumchain \
   --mining \
   --wallet YOUR_AUR_ADDRESS \
-  --peer [IP_VPS3]:3001
+  --peer 57.131.22.120:3001
 ```
 
 ---
@@ -95,7 +95,7 @@ After connecting, verify you're syncing with the network:
 curl http://localhost:8001/chain_info
 
 # Compare with a bootstrap node
-curl http://[IP_VPS1]:8001/chain_info
+curl http://135.125.174.27:8001/chain_info
 
 # If heights match, you're synchronized! ✅
 ```
@@ -112,13 +112,13 @@ Currently, AuriumChain connects to one peer at a time. Multi-peer support is pla
 
 ```bash
 # Check Germany node
-curl http://[IP_VPS1]:8001/status
+curl http://135.125.174.27:8001/status
 
 # Check Canada node
-curl http://[IP_VPS2]:8001/status
+curl http://158.69.1.236:8001/status
 
 # Check Milan node
-curl http://[IP_VPS3]:8001/status
+curl http://57.131.22.120:8001/status
 ```
 
 All should return `{"status":"running"}` if online.
